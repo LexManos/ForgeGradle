@@ -1,0 +1,27 @@
+#eclipse
+**/bin
+**/.settings
+**/.classpath
+*.project
+
+#In case people make their workspace in the repo
+/eclipse/
+
+#idea
+/.idea
+/*/out
+/classes
+*.iml
+
+#gradle
+/build
+/.gradle
+/tests/*/build
+/tests/*/.gradle
+
+#occupational hazards
+/repo/
+/tests/*/logs/
+/tests/*/eula.txt
+/tests/*/server.properties
+/tests/*/debug.log

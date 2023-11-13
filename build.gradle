@@ -1,0 +1,99 @@
+plugins {
+    id 'org.cadixdev.licenser' version '0.6.1'
+    id 'maven-publish'
+    id 'java'
+    id 'java-gradle-plugin'
+    id 'eclipse'
+    id 'net.minecraftforge.gradleutils' version '[2.3.0,3.0)'
+}
+
+repositories {
+    maven gradleutils.forgeMaven
+    mavenCentral()
+    maven { url = 'https://nexus.covers1624.net/repository/maven-releases/' } // Need for DiffPatch
+}
+
+group = 'net.minecraftforge'
+version = gradleutils.tagOffsetVersion
+println("Version: $version")
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(17) // asm-tree Requires Java 9, so fuck it lets use 17 so we get VAR and other cool shit
+java.withSourcesJar()
+
+dependencies {
+    implementation 'org.ow2.asm:asm:9.5'
+    implementation 'org.ow2.asm:asm-tree:9.5'
+    implementation 'net.minecraftforge:srgutils:0.5.6'
+    implementation 'commons-io:commons-io:2.12.0'
+    implementation 'org.eclipse.jgit:org.eclipse.jgit:6.5.0.202303070854-r'
+
+    implementation 'de.undercouch:gradle-download-task:5.4.0' // Because why reinvent the wheel to download things?
+    implementation 'com.google.code.gson:gson:2.10.1'
+    implementation 'com.google.guava:guava:32.1.1-jre'
+    implementation 'org.apache.maven:maven-artifact:3.9.3'
+
+    implementation 'de.siegmar:fastcsv:2.2.2'
+    implementation 'org.jetbrains:annotations:24.0.1' // ApiStatus
+    implementation 'com.github.codemonstur:simplexml:3.0.0' // XML reading and Writng because Gradle's API is broken. https://github.com/gradle/gradle/issues/19577
+
+    implementation 'codechicken:DiffPatch:1.5.0.29' // Fuzzy patching TODO: cleanup API/Packages
+}
+
+license {
+    header project.file('LICENSE-header.txt')
+}
+
+gradlePlugin {
+    plugins {
+        gradle {
+            id = 'net.minecraftforge.gradle'
+            implementationClass = 'net.minecraftforge.gradle.ForgeGradlePlugin'
+        }
+    }
+}
+
+changelog {
+    fromBase()
+    publishAll = false
+}
+
+compileJava {
+    options.encoding = 'UTF-8'
+}
+
+jar {
+    manifest {
+        attributes([
+            'Specification-Title':   'ForgeGradle',
+            'Specification-Vendor':  'Forge Development LLC',
+            'Specification-Version':  gradleutils.gitInfo.tag,
+            'Implementation-Title':  'ForgeGradle',
+            'Implementation-Vendor': 'Forge Development LLC',
+            'Implementation-Version': project.version
+        ] as LinkedHashMap, 'net/minecraftforge/gradle/')
+    }
+}
+
+publishing {
+    publications.register('mavenJava', MavenPublication) {
+        artifactId = 'ForgeGradle'
+        changelog.publish(it)
+        pom {
+            name = 'ForgeGradle'
+            description = 'Gradle plugin that allows for development of Minecraft mods using Forge'
+            url = 'https://github.com/MinecraftForge/ForgeGradle'
+
+            gradleutils.pom.setGitHubDetails(pom, 'ForgeGradle')
+
+            license gradleutils.pom.licenses.LGPLv2_1
+
+            developers {
+                developer gradleutils.pom.Developers.LexManos
+            }
+        }
+    }
+
+    repositories {
+        maven gradleutils.publishingForgeMaven
+    }
+}
