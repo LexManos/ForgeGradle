@@ -318,9 +318,10 @@ import java.util.concurrent.Callable
                 Closure closure
         ) {
             // creation + validation
-            new MinecraftDependencyImpl(this.project.dependencies.create(value), this.project, MinecraftExtensionImpl.this.problems, MinecraftExtensionImpl.this.objects, this.providers).tap { dependency ->
+            def vanilla = this.project.dependencies.create(value, closure)
+            new MinecraftDependencyImpl(vanilla, this.project, MinecraftExtensionImpl.this.problems, MinecraftExtensionImpl.this.objects, this.providers).tap { dependency ->
                 // configuration
-                Closures.invoke(dependency, closure)
+                //Closures.invoke(dependency, closure)
 
                 // finish
                 this.minecraftDependencies.add(dependency)
