@@ -13,15 +13,4 @@ import org.gradle.api.artifacts.ExternalModuleDependency;
 /// implementation is not itself an [ExternalModuleDependency], but the [MinecraftDependency] closure owner provides an
 /// abstraction that delegates to both of those interfaces simultaneously.
 public interface ClosureOwner {
-    /// A closure owner that delegates to [net.minecraftforge.gradle.MinecraftDependency] and
-    /// [ExternalModuleDependency].
-    ///
-    /// @see ClosureOwner
-    interface MinecraftDependency extends ClosureOwner, net.minecraftforge.gradle.MinecraftDependency, ExternalModuleDependency { }
-
-    /// A closure owner that delegates to [net.minecraftforge.gradle.MinecraftDependencyWithAccessTransformers] and
-    /// [ExternalModuleDependency].
-    ///
-    /// @see ClosureOwner
-    interface MinecraftDependencyWithAccessTransformers extends ClosureOwner, net.minecraftforge.gradle.MinecraftDependencyWithAccessTransformers, ExternalModuleDependency { }
 }

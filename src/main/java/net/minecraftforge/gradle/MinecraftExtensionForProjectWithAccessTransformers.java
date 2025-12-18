@@ -10,7 +10,7 @@ import org.gradle.api.provider.Property;
 /// the `net.minecraftforge.accesstransformers` plugin has been applied before ForgeGradle.
 ///
 /// @see MinecraftExtensionForProject
-public interface MinecraftExtensionForProjectWithAccessTransformers extends MinecraftExtensionForProject<ClosureOwner.MinecraftDependencyWithAccessTransformers> {
+public interface MinecraftExtensionForProjectWithAccessTransformers {
     /// The path, relative to the related Minecraft dependency's [org.gradle.api.tasks.SourceSet#getResources()], to the
     /// AccessTransformers config file to use. If set, this will recursively enable access transformers for all
     /// Minecraft dependencies in the project.

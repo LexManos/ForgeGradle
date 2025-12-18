@@ -101,7 +101,10 @@ abstract class MinecraftDependencyImpl implements MinecraftDependencyInternal {
             if (module.isChanging())
                 throw this.problems.changingMinecraftDependency(module);
 
-            Closures.invoke(this.closure(closure), module);
+
+
+                //return closure.rehydrate(closure.getDelegate(), new ClosureOwnerImpl.MinecraftDependencyImpl(closure.getOwner(), this), closure.getThisObject());
+            //Closures.invoke(this.closure(closure), module);
 
             ((ExtensionAware) module).getExtensions().getExtraProperties().set(MC_EXT_NAME, this);
 
@@ -199,15 +202,17 @@ abstract class MinecraftDependencyImpl implements MinecraftDependencyInternal {
         this.mappings.set(this.getObjects().newInstance(MinecraftMappingsImpl.class, channel, version));
     }
 
-    static abstract class WithAccessTransformersImpl extends MinecraftDependencyImpl implements WithAccessTransformers {
-        private final RegularFileProperty atFile = this.getObjects().fileProperty();
+    /*
+    static abstract class WithAccessTransformersImpl implements MinecraftDependencyInternal.WithAccessTransformers {
+        protected abstract @Inject Project getProject();
+
+        private final RegularFileProperty atFile = this.getProject().getObjects().fileProperty();
         private final Property<String> atPath = this
-            .getObjects().property(String.class)
+            .getProject().getObjects().property(String.class)
             .convention(getProject().getExtensions().getByType(MinecraftExtensionForProjectWithAccessTransformers.class).getAccessTransformers());
 
         private final Attribute<Boolean> attribute = this.registerTransform();
 
-        @Inject
         public WithAccessTransformersImpl(Provider<? extends Directory> mavenizerOutput) {
             super(mavenizerOutput);
         }
@@ -301,4 +306,5 @@ abstract class MinecraftDependencyImpl implements MinecraftDependencyInternal {
                 this.atPath.unsetConvention().unset();
         }
     }
+     */
 }

@@ -6,18 +6,18 @@ package net.minecraftforge.gradle.internal;
 
 import groovy.lang.Closure;
 import groovy.lang.DelegatesTo;
+import groovy.lang.GroovyObjectSupport;
 import groovy.transform.CompileStatic;
 import groovy.transform.NamedVariant;
 import groovy.transform.PackageScope;
 import groovy.transform.stc.ClosureParams;
 import groovy.transform.stc.FromString;
 import groovy.transform.stc.SimpleType;
-import net.minecraftforge.gradle.ClosureOwner;
-import net.minecraftforge.gradle.MinecraftDependency;
 import net.minecraftforge.gradle.MinecraftExtension;
-import net.minecraftforge.gradle.MinecraftExtensionForProject;
 import net.minecraftforge.gradle.MinecraftMappings;
 import net.minecraftforge.gradle.SlimeLauncherOptions;
+import net.minecraftforge.gradleutils.shared.Closures;
+import org.codehaus.groovy.runtime.GeneratedClosure;
 import org.gradle.api.Action;
 import org.gradle.api.NamedDomainObjectContainer;
 import org.gradle.api.Project;
@@ -32,13 +32,19 @@ import org.gradle.api.file.ProjectLayout;
 import org.gradle.api.flow.FlowProviders;
 import org.gradle.api.flow.FlowScope;
 import org.gradle.api.initialization.Settings;
+import org.gradle.api.logging.Logger;
+import org.gradle.api.logging.Logging;
 import org.gradle.api.model.ObjectFactory;
 import org.gradle.api.plugins.ExtensionAware;
 import org.gradle.api.plugins.JavaPluginExtension;
 import org.gradle.api.provider.Property;
 import org.gradle.api.provider.ProviderFactory;
+import org.gradle.api.reflect.HasPublicType;
 import org.gradle.api.reflect.TypeOf;
 import org.gradle.plugins.ide.eclipse.model.EclipseModel;
+import org.gradle.util.Configurable;
+import org.gradle.util.internal.ConfigureUtil;
+import org.jspecify.annotations.Nullable;
 
 import javax.inject.Inject;
 import java.io.File;
@@ -48,7 +54,8 @@ import java.util.Objects;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
-abstract class MinecraftExtensionImpl implements MinecraftExtensionInternal {
+abstract class MinecraftExtensionImpl extends GroovyObjectWithDelegate.Impl implements MinecraftExtensionInternal, HasPublicType {
+    private static final Logger LOGGER = Logging.getLogger(MinecraftExtensionImpl.class);
     private static final String EXT_MAVEN_REPOS = "fg_mc_maven_repos";
     private static final String EXT_MAPPINGS = "fg_mc_mappings";
 
@@ -59,6 +66,7 @@ abstract class MinecraftExtensionImpl implements MinecraftExtensionInternal {
 
     // Dependencies
     final Property<MinecraftMappingsImpl> mappings;
+    private final TypeOf<?> publicType;
 
     protected abstract @Inject ObjectFactory getObjects();
 
@@ -68,35 +76,29 @@ abstract class MinecraftExtensionImpl implements MinecraftExtensionInternal {
     ) {
         var extensions = target.getExtensions();
         if (target instanceof Project project) {
-            if (project.getPluginManager().hasPlugin("net.minecraftforge.accesstransformers")) {
-                try {
-                    extensions.create(MinecraftExtension.NAME, MinecraftExtensionImpl.ForProjectImpl.WithAccessTransformersImpl.class, plugin);
-                } catch (Exception e) {
-                    var problems = project.getObjects().newInstance(ForgeGradleProblems.class);
-                    throw problems.accessTransformersNotOnClasspath(e);
-                }
-            } else {
-                extensions.create(MinecraftExtension.NAME, MinecraftExtensionImpl.ForProjectImpl.class, plugin);
-            }
+            var plugins = KnownPlugins.find(project);
+            var publicType = plugins.getExtensionType();
+            var delegate = plugins.getExtensionDelegate();
+            extensions.create(MinecraftExtension.NAME, MinecraftExtensionImpl.ForProjectImpl.class, plugin, publicType, delegate);
         } else if (target instanceof Settings) {
-            extensions.create(MinecraftExtension.NAME, MinecraftExtensionImpl.ForSettingsImpl.class, plugin, target);
+            extensions.create(MinecraftExtension.NAME, MinecraftExtensionImpl.ForSettingsImpl.class, plugin, TypeOf.typeOf(MinecraftExtension.class), null, target);
         } else {
-            extensions.create(MinecraftExtension.NAME, MinecraftExtensionImpl.class, plugin);
+            extensions.create(MinecraftExtension.NAME, MinecraftExtensionImpl.class, plugin, TypeOf.typeOf(MinecraftExtension.class), null);
         }
     }
 
-    @Inject
-    public MinecraftExtensionImpl(ForgeGradlePlugin plugin) {
+    public MinecraftExtensionImpl(ForgeGradlePlugin plugin, TypeOf<?> publicType, @Nullable Object delegate) {
+        super(delegate);
         this.problems = this.getObjects().newInstance(ForgeGradleProblems.class);
-
         this.mavenizerOutput = this.getObjects().directoryProperty().convention(plugin.localCaches().dir("mavenizer/output").map(this.problems.ensureFileLocation()));
-
         this.mappings = this.getObjects().property(MinecraftMappingsImpl.class);
+        this.publicType = publicType;
+        LOGGER.lifecycle("Extension Type: {}", this.publicType);
     }
 
     @Override
     public TypeOf<?> getPublicType() {
-        return MinecraftExtensionInternal.super.getPublicType();
+        return this.publicType;
     }
 
     @Override
@@ -130,8 +132,8 @@ abstract class MinecraftExtensionImpl implements MinecraftExtensionInternal {
     @PackageScope
     static abstract class ForSettingsImpl extends MinecraftExtensionImpl {
         @Inject
-        public ForSettingsImpl(ForgeGradlePlugin plugin, Settings settings) {
-            super(plugin);
+        public ForSettingsImpl(ForgeGradlePlugin plugin, TypeOf<?> publicType, @Nullable Object delegate, Settings settings) {
+            super(plugin, publicType, delegate);
             settings.getGradle().settingsEvaluated(this::finish);
         }
 
@@ -145,7 +147,10 @@ abstract class MinecraftExtensionImpl implements MinecraftExtensionInternal {
         }
     }
 
-    static abstract class ForProjectImpl<T extends ClosureOwner & MinecraftDependency & ExternalModuleDependency> extends MinecraftExtensionImpl implements MinecraftExtensionInternal.ForProject<T> {
+    static abstract class ForProjectImpl<T> extends MinecraftExtensionImpl
+        implements MinecraftExtensionInternal.ForProject<T>
+            ,Configurable<ForProjectImpl<T>>
+    {
         // Slime Launcher
         private final NamedDomainObjectContainer<SlimeLauncherOptionsImpl> runs;
 
@@ -162,9 +167,8 @@ abstract class MinecraftExtensionImpl implements MinecraftExtensionInternal {
 
         protected abstract @Inject ProviderFactory getProviders();
 
-        @Inject
-        public ForProjectImpl(ForgeGradlePlugin plugin) {
-            super(plugin);
+        public ForProjectImpl(ForgeGradlePlugin plugin, TypeOf<?> publicType, @Nullable Object delegate) {
+            super(plugin, publicType, delegate);
             var project = getProject();
 
             this.runs = this.getObjects().domainObjectContainer(SlimeLauncherOptionsImpl.class);
@@ -190,8 +194,40 @@ abstract class MinecraftExtensionImpl implements MinecraftExtensionInternal {
         }
 
         @Override
-        public TypeOf<?> getPublicType() {
-            return new TypeOf<MinecraftExtensionForProject<ClosureOwner.MinecraftDependency>>() { };
+        public void setProperty(String propertyName, Object newValue) {
+            LOGGER.lifecycle("set property " + propertyName);
+            super.setProperty(propertyName, newValue);
+        }
+
+        private transient boolean configuring = false;
+        //@Override
+        public ForProjectImpl<T> configure(Closure cl) {
+            if (this.configuring) {
+                return this;
+            }
+            LOGGER.lifecycle("Configuring: {}", cl);
+            LOGGER.lifecycle("  Meta: " + this.getMetaClass());
+            LOGGER.lifecycle("  Generated: {}" , cl instanceof GeneratedClosure);
+            LOGGER.lifecycle("  delegate: {}", cl.getDelegate());
+            LOGGER.lifecycle("  owner:    {}", cl.getOwner());
+            LOGGER.lifecycle("  this:     {}", cl.getThisObject());
+            LOGGER.lifecycle("  strategy: {}", cl.getResolveStrategy());
+            // This makes the delegates, and extension work, but it cant access project stuff
+            cl = cl.rehydrate(getDelegate(), this, cl.getThisObject());
+            //cl.setResolveStrategy(Closure.OWNER_FIRST);
+            LOGGER.lifecycle("  delegate: {}", cl.getDelegate());
+            LOGGER.lifecycle("  owner:    {}", cl.getOwner());
+            LOGGER.lifecycle("  this:     {}", cl.getThisObject());
+            LOGGER.lifecycle("  strategy: {}", cl.getResolveStrategy());
+            //cl.call(this);
+            try {
+                this.configuring = true;
+                Closures.invoke(cl);
+                //ConfigureUtil.configureSelf(cl, this);
+            } finally {
+                this.configuring = false;
+            }
+            return this;
         }
 
         @Override
@@ -340,11 +376,8 @@ abstract class MinecraftExtensionImpl implements MinecraftExtensionInternal {
             @ClosureParams(value = FromString.class, options = "org.gradle.api.NamedDomainObjectContainer<net.minecraftforge.gradle.SlimeLauncherOptions>")
             Closure<?> closure
         ) {
+            LOGGER.lifecycle("runs " + closure);
             this.runs.configure(closure);
-        }
-
-        Class<? extends MinecraftDependencyInternal> getMinecraftDependencyClass() {
-            return MinecraftDependencyImpl.class;
         }
 
         @Override
@@ -359,7 +392,7 @@ abstract class MinecraftExtensionImpl implements MinecraftExtensionInternal {
             if (value instanceof ExternalModuleDependencyBundle)
                 throw new IllegalArgumentException("Minecraft dependency cannot be a bundle");
 
-            var minecraftDependency = (MinecraftDependencyInternal) this.getObjects().newInstance(this.getMinecraftDependencyClass(), this.mavenizerOutput);
+            var minecraftDependency = (MinecraftDependencyInternal) this.getObjects().newInstance(MinecraftDependencyImpl.class, this.mavenizerOutput);
             this.minecraftDependencies.add(minecraftDependency);
             return minecraftDependency.init(value, closure);
         }
@@ -396,30 +429,6 @@ abstract class MinecraftExtensionImpl implements MinecraftExtensionInternal {
             // Mojang
             if (!contains.test("libraries.minecraft.net")) {
                 problems.reportMcLibsMavenNotDeclared();
-            }
-        }
-
-        static abstract class WithAccessTransformersImpl extends ForProjectImpl<ClosureOwner.MinecraftDependencyWithAccessTransformers> implements MinecraftExtensionInternal.ForProject.WithAccessTransformers {
-            private final Property<String> accessTransformers = this.getObjects().property(String.class);
-
-            @Inject
-            public WithAccessTransformersImpl(ForgeGradlePlugin plugin) {
-                super(plugin);
-            }
-
-            @Override
-            public TypeOf<?> getPublicType() {
-                return MinecraftExtensionInternal.ForProject.WithAccessTransformers.super.getPublicType();
-            }
-
-            @Override
-            public Property<String> getAccessTransformers() {
-                return this.accessTransformers;
-            }
-
-            @Override
-            final Class<? extends MinecraftDependencyImpl> getMinecraftDependencyClass() {
-                return MinecraftDependencyImpl.WithAccessTransformersImpl.class;
             }
         }
     }

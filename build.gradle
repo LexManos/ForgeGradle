@@ -65,6 +65,7 @@ dependencies {
 
     // Utils
     implementation libs.bundles.utils
+    implementation libs.maven.artifact
 }
 
 license {

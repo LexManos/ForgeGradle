@@ -10,7 +10,7 @@ import org.gradle.api.file.RegularFileProperty;
 /// AccessTransformers.
 ///
 /// @see MinecraftDependency
-public interface MinecraftDependencyWithAccessTransformers extends MinecraftDependency {
+public interface MinecraftDependencyWithAccessTransformers {
     /// The default path, from the source set's [resources][org.gradle.api.tasks.SourceSet#getResources()], for the
     /// AccessTransformers config to be located in.
     String DEFAULT_PATH = "META-INF/accesstransformer.cfg";

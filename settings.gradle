@@ -36,6 +36,8 @@ dependencyResolutionManagement.versionCatalogs.register('libs') {
     // Static Analysis
     library 'annotations-jspecify', 'org.jspecify', 'jspecify' version '1.0.0'
 
+    library('maven-artifact', 'org.apache.maven:maven-artifact:3.8.8')
+
     // Gradle API
     // Original: https://github.com/remal-gradle-api/packages/packages/760197?version=9.0.0
     // Mirror:   https://repos.moddinglegacy.com/#/modding-legacy/name/remal/gradle-api/gradle-api/9.0.0

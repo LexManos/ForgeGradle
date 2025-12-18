@@ -54,22 +54,7 @@ interface MinecraftDependencyInternal extends MinecraftDependency, HasPublicType
 
     Action<? super AttributeContainer> addAttributes();
 
-    default <R> Closure<R> closure(Closure<R> closure) {
-        return closure.rehydrate(closure.getDelegate(), new ClosureOwnerImpl.MinecraftDependencyImpl(closure.getOwner(), this), closure.getThisObject());
-    }
-
     void handle(Configuration configuration);
 
     void handle(SourceSet sourceSet);
-
-    interface WithAccessTransformers extends MinecraftDependencyWithAccessTransformers, MinecraftDependencyInternal {
-        @Override
-        default TypeOf<?> getPublicType() {
-            return TypeOf.typeOf(MinecraftDependencyWithAccessTransformers.class);
-        }
-
-        default <R> Closure<R> closure(Closure<R> closure) {
-            return closure.rehydrate(closure.getDelegate(), new ClosureOwnerImpl.MinecraftDependencyWithAccessTransformersImpl(closure.getOwner(), this), closure.getThisObject());
-        }
-    }
 }

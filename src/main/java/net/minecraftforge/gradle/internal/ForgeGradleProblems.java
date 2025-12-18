@@ -13,6 +13,7 @@ import org.gradle.api.problems.ProblemSpec;
 import org.gradle.api.problems.Problems;
 import org.gradle.api.problems.Severity;
 import org.gradle.api.provider.ProviderFactory;
+import org.jspecify.annotations.Nullable;
 
 import javax.inject.Inject;
 import java.io.File;
@@ -207,7 +208,7 @@ abstract class ForgeGradleProblems extends EnhancedProblems {
     //endregion
 
     //region Access Transformers
-    void reportAccessTransformersNotApplied(Throwable e) {
+    void reportAccessTransformersNotApplied(@Nullable Throwable e) {
         this.report("access-transformers-not-applied", "AccessTransformers plugin not applied", spec -> spec
             .details("""
                 The build failed with an exception when trying to access access transformers.
@@ -236,6 +237,37 @@ abstract class ForgeGradleProblems extends EnhancedProblems {
             .severity(Severity.ERROR)
             .stackLocation()
             .solution("Declare the 'net.minecraftforge.accesstransformers' plugin before ForgeGradle.")
+            .solution(HELP_MESSAGE)
+        );
+    }
+
+    //endregion
+
+    //region Generic Plugins
+    RuntimeException incorrectPluginVersion(String name, String detected, String required) {
+        return this.throwing(new RuntimeException("Invalid " + name  + " plugin version"), "incorrect-plugin-version", "Incorrect Plugin Version", spec -> spec
+            .details("Detected the %s plugin at version %s, we require at least version %s.".formatted(name, detected, required))
+            .severity(Severity.ERROR)
+            .stackLocation()
+            .solution("Update the '%s' to at least version %s".formatted(name, required))
+            .solution(HELP_MESSAGE)
+        );
+    }
+
+    void warnPluginOrder(String name) {
+        this.report("plugin-order", "Invalid Plugin Order",spec -> spec
+            .details("""
+            The %s plugin was not loaded in the classpath before ForgeGradle.
+            For better code completion in IntelliJ, it is recommended that you apply it before ForgeGradle.
+            ```groovy
+            plugins {
+                id '%s'
+                id 'net.minecraftforge.gradle'
+            }
+            ```""".formatted(name, name))
+            .severity(Severity.WARNING)
+            .stackLocation()
+            .solution("Declare the '%s' plugin before ForgeGradle.".formatted(name))
             .solution(HELP_MESSAGE)
         );
     }

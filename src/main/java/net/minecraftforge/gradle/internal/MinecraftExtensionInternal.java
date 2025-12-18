@@ -4,23 +4,14 @@
  */
 package net.minecraftforge.gradle.internal;
 
-import net.minecraftforge.gradle.ClosureOwner;
 import net.minecraftforge.gradle.MinecraftExtension;
 import net.minecraftforge.gradle.MinecraftExtensionForProject;
-import net.minecraftforge.gradle.MinecraftExtensionForProjectWithAccessTransformers;
 import org.gradle.api.artifacts.repositories.MavenArtifactRepository;
 import org.gradle.api.attributes.Attribute;
-import org.gradle.api.reflect.HasPublicType;
-import org.gradle.api.reflect.TypeOf;
 
 import java.util.List;
 
-interface MinecraftExtensionInternal extends MinecraftExtension, HasPublicType, MinecraftMappingsContainerInternal {
-    @Override
-    default TypeOf<?> getPublicType() {
-        return TypeOf.typeOf(MinecraftExtension.class);
-    }
-
+interface MinecraftExtensionInternal extends MinecraftExtension, MinecraftMappingsContainerInternal {
     @Override
     default Attributes getAttributes() {
         return AttributesInternal.INSTANCE;
@@ -49,19 +40,7 @@ interface MinecraftExtensionInternal extends MinecraftExtension, HasPublicType, 
         }
     }
 
-    interface ForProject<T extends ClosureOwner> extends MinecraftExtensionForProject<T>, MinecraftExtensionInternal, HasPublicType {
-        @Override
-        default TypeOf<?> getPublicType() {
-            return new TypeOf<MinecraftExtensionForProject<ClosureOwner.MinecraftDependency>>() { };
-        }
-
+    interface ForProject<T> extends MinecraftExtensionForProject<T>, MinecraftExtensionInternal {
         List<? extends MavenArtifactRepository> getRepositories();
-
-        interface WithAccessTransformers extends MinecraftExtensionForProjectWithAccessTransformers, MinecraftExtensionInternal.ForProject<ClosureOwner.MinecraftDependencyWithAccessTransformers>, HasPublicType {
-            @Override
-            default TypeOf<?> getPublicType() {
-                return TypeOf.typeOf(MinecraftExtensionForProjectWithAccessTransformers.class);
-            }
-        }
     }
 }
