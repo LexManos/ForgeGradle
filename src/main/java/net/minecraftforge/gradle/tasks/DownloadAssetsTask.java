@@ -4,6 +4,7 @@ import groovy.lang.Closure;
 
 import java.io.BufferedInputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
@@ -84,7 +85,7 @@ public class DownloadAssetsTask extends DefaultTask
             spawnThread();
             Thread.sleep(1000);
         }
-        
+
         if (errored)
         {
             // CRASH!
@@ -184,7 +185,7 @@ public class DownloadAssetsTask extends DefaultTask
                         // check for local copy
                         if (localMc.exists() && Constants.hash(localMc, "SHA1").equals(asset.hash))
                             // if so, copy
-                            stream = new BufferedInputStream(Files.newInputStreamSupplier(localMc).getInput());
+                            stream = new BufferedInputStream(new FileInputStream(localMc));
                         else
                             // otherwise download
                             stream = new BufferedInputStream(new URL(Constants.ASSETS_URL + "/" + asset.path).openStream());
