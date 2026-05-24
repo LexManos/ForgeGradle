@@ -40,7 +40,7 @@ public class JsonFactory
         reader.close();
         return v;
     }
-    
+
     public static AssetIndex loadAssetsIndex(File json) throws JsonSyntaxException, JsonIOException, IOException
     {
         FileReader reader = new FileReader(json);
@@ -62,5 +62,12 @@ public class JsonFactory
             ret.put(entry.getKey(), GSON.fromJson(entry.getValue(), MCInjectorStruct.class));
         }
         return ret;
+    }
+
+    public static LauncherManifest loadMCVersionManifest(File json) throws JsonSyntaxException, JsonIOException, IOException {
+        FileReader reader = new FileReader(json);
+        LauncherManifest a = GSON.fromJson(reader, LauncherManifest.class);
+        reader.close();
+        return a;
     }
 }

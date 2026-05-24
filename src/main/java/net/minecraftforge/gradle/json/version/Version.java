@@ -19,7 +19,9 @@ public class Version
     public String incompatibilityReason;
     private String assets;
     public List<OSRule> rules;
-    
+    public Downloads downloads; // technically a Map<String, Download.Info> but i'm lazys
+    public Downloads.Info assetIndex;
+
     private List<Library> _libraries;
 
     public List<Library> getLibraries()
@@ -38,9 +40,21 @@ public class Version
         }
         return _libraries;
     }
-    
+
     public String getAssets()
     {
         return assets == null ? Constants.ASSETS_INDEX : assets;
+    }
+
+
+    public static class Downloads {
+        public Info client;
+        public Info server;
+
+        public static class Info {
+            public String sha1;
+            public long size;
+            public String url;
+        }
     }
 }

@@ -55,14 +55,14 @@ public class ObfuscateTask extends DefaultTask
             if (act != null)
                 act.execute(childProj);
         }
-        
+
         AbstractTask compileTask = (AbstractTask) childProj.getTasks().getByName("compileJava");
         AbstractTask jarTask = (AbstractTask) childProj.getTasks().getByName(subTask);
 
         // executing jar task
         getLogger().debug("Executing child "+subTask+" task...");
         executeTask(jarTask);
-        
+
         File inJar = (File)jarTask.property("archivePath");
 
         File srg = getSrg();
@@ -75,15 +75,15 @@ public class ObfuscateTask extends DefaultTask
             exceptor.excConfig = getExc();
             exceptor.fieldCSV = getFieldsCsv();
             exceptor.methodCSV = getMethodsCsv();
-            
+
             File outSrg =  new File(this.getTemporaryDir(), "reobf_cls.srg");
-            
+
             exceptor.doFirstThings();
             exceptor.buildSrg(srg, outSrg);
-            
+
             srg = outSrg;
         }
-        
+
         // append SRG
         BufferedWriter writer = new BufferedWriter(new FileWriter(srg, true));
         for (String line : extraSrg)
@@ -102,7 +102,8 @@ public class ObfuscateTask extends DefaultTask
     {
         for (Object dep : task.getTaskDependencies().getDependencies(task))
         {
-            executeTask((AbstractTask) dep);
+            if (dep instanceof AbstractTask)
+                executeTask((AbstractTask) dep);
         }
 
         if (!task.getState().getExecuted())
@@ -162,7 +163,7 @@ public class ObfuscateTask extends DefaultTask
     {
         this.outJar = outJar;
     }
-    
+
     public File getPreFFJar()
     {
         return preFFJar.call();
@@ -233,7 +234,7 @@ public class ObfuscateTask extends DefaultTask
     {
         this.fieldsCsv = fieldsCsv;
     }
-    
+
     public void configureProject(Action<Project> action)
     {
         configureProject.add(action);

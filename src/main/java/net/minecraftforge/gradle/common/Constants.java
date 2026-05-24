@@ -42,6 +42,7 @@ public class Constants
 
     public static final OS               OPERATING_SYSTEM = OS.CURRENT;
     public static final SystemArch       SYSTEM_ARCH      = getArch();
+    public static final String USER_AGENT = "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.95 Safari/537.11";
 
     // extension nam
     public static final String EXT_NAME_MC      = "minecraft";
@@ -54,13 +55,12 @@ public class Constants
     public static final Closure<Boolean> CALL_FALSE = new Closure<Boolean>(null){ public Boolean call(Object o){ return false; }};
 
     // urls
-    public static final String MC_JAR_URL       = "http://s3.amazonaws.com/Minecraft.Download/versions/{MC_VERSION}/{MC_VERSION}.jar";
-    public static final String MC_SERVER_URL    = "http://s3.amazonaws.com/Minecraft.Download/versions/{MC_VERSION}/minecraft_server.{MC_VERSION}.jar";
-    public static final String MCP_URL          = "http://files.minecraftforge.net/fernflower_temporary.zip";
+    public static final String MCP_URL          = "https://files.minecraftforge.net/fernflower_temporary.zip";
     public static final String ASSETS_URL       = "http://resources.download.minecraft.net";
     public static final String LIBRARY_URL      = "https://libraries.minecraft.net/";
-    public static final String FORGE_MAVEN      = "http://files.minecraftforge.net/maven";
-    public static final String ASSETS_INDEX_URL = "https://s3.amazonaws.com/Minecraft.Download/indexes/{ASSET_INDEX}.json";
+    public static final String FORGE_MAVEN      = "https://maven.minecraftforge.net/";
+    public static final String CENTRAL_MAVEN    = "https://repo1.maven.org/maven2/";
+
 
     public static final String LOG              = ".gradle/gradle.log";
     public static final String ASSETS_INDEX     =  "legacy";
@@ -72,6 +72,11 @@ public class Constants
     public static final String FERNFLOWER       = "{CACHE_DIR}/minecraft/fernflower.jar";
     public static final String EXCEPTOR         = "{CACHE_DIR}/minecraft/exceptor.jar";
     public static final String ASSETS           = "{CACHE_DIR}/minecraft/assets";
+
+    public static final String LAUNCHER_MANIFEST_URL = "https://launchermeta.mojang.com/mc/game/version_manifest_v2.json";
+    public static final String JSONS_DIR         = "{CACHE_DIR}/minecraft/version_jsons";
+    public static final String LAUNCHER_MANIFEST = JSONS_DIR + "/minecraft/version_manifest_v2.json";
+    public static final String VERSION_JSON      = JSONS_DIR + "/minecraft/net/minecraft/{MC_VERSION}/version.json";
 
     // util
     public static final String NEWLINE = System.getProperty("line.separator");
@@ -110,7 +115,7 @@ public class Constants
         }
         return list;
     }
-    
+
     public static File getMinecraftDirectory()
     {
         String userDir = System.getProperty("user.home");
@@ -150,11 +155,11 @@ public class Constants
         else
             return hash(file, "MD5");
     }
-    
+
     public static List<String> hashAll(File file)
     {
         LinkedList<String> list = new LinkedList<String>();
-        
+
         if (file.isDirectory())
         {
             for (File f : file.listFiles())
@@ -162,7 +167,7 @@ public class Constants
         }
         else
             list.add(hash(file));
-        
+
         return list;
     }
 
@@ -171,11 +176,11 @@ public class Constants
         try
         {
             MessageDigest hasher = MessageDigest.getInstance(function);
-            
+
             InputStream fis = new FileInputStream(file);
             hasher.update(ByteStreams.toByteArray(fis));
             fis.close();
-            
+
             byte[] hash = hasher.digest();
 
             // convert to string
@@ -191,7 +196,7 @@ public class Constants
 
         return null;
     }
-    
+
     public static String hashZip(File file, String function)
     {
         try
@@ -206,10 +211,10 @@ public class Constants
                 hasher.update(ByteStreams.toByteArray(zin));
             }
             zin.close();
-            
+
             byte[] hash = hasher.digest();
 
-            
+
             // convert to string
             String result = "";
 

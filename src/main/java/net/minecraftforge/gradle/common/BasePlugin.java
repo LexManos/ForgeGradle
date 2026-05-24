@@ -13,11 +13,13 @@ import net.minecraftforge.gradle.delayed.DelayedFile;
 import net.minecraftforge.gradle.delayed.DelayedFileTree;
 import net.minecraftforge.gradle.delayed.DelayedString;
 import net.minecraftforge.gradle.json.JsonFactory;
+import net.minecraftforge.gradle.json.LauncherManifest;
 import net.minecraftforge.gradle.json.version.AssetIndex;
 import net.minecraftforge.gradle.json.version.Version;
 import net.minecraftforge.gradle.tasks.DownloadAssetsTask;
 import net.minecraftforge.gradle.tasks.ObtainFernFlowerTask;
 import net.minecraftforge.gradle.tasks.abstractutil.DownloadTask;
+import net.minecraftforge.gradle.tasks.abstractutil.EtagDownloadTask;
 
 import org.gradle.api.Action;
 import org.gradle.api.DefaultTask;
@@ -30,8 +32,6 @@ import org.gradle.api.tasks.Delete;
 import org.gradle.testfixtures.ProjectBuilder;
 
 import com.google.common.base.Throwables;
-import com.google.gson.JsonIOException;
-import com.google.gson.JsonSyntaxException;
 
 public abstract class BasePlugin<K extends BaseExtension> implements Plugin<Project>, IDelayedResolver<K>
 {
@@ -65,7 +65,7 @@ public abstract class BasePlugin<K extends BaseExtension> implements Plugin<Proj
             public void execute(Project proj)
             {
                 addMavenRepo(proj, "forge", Constants.FORGE_MAVEN);
-                proj.getRepositories().mavenCentral();
+                addMavenRepo(proj, "central", Constants.CENTRAL_MAVEN);
                 addMavenRepo(proj, "minecraft", Constants.LIBRARY_URL);
             }
         });
@@ -77,20 +77,11 @@ public abstract class BasePlugin<K extends BaseExtension> implements Plugin<Proj
             {
                 afterEvaluate();
 
-                try
-                {
-                    if (version != null)
-                    {
-                        File index = delayedFile(Constants.ASSETS + "/indexes/" + version.getAssets() + ".json").call();
-                        if (index.exists())
-                            parseAssetIndex();
-                    }
+                if (version != null){
+                    File index = delayedFile(Constants.ASSETS + "/indexes/" + version.getAssets() + ".json").call();
+                    if (index.exists())
+                        parseAssetIndex();
                 }
-                catch (Exception e)
-                {
-                    Throwables.propagate(e);
-                }
-
                 finalCall();
             }
         });
@@ -129,73 +120,107 @@ public abstract class BasePlugin<K extends BaseExtension> implements Plugin<Proj
     @SuppressWarnings("serial")
     private void makeObtainTasks()
     {
+        {
+            EtagDownloadTask task = makeTask("getVersionJsonIndex", EtagDownloadTask.class);
+            task.setUri(delayedString(Constants.LAUNCHER_MANIFEST_URL));
+            task.setFile(delayedFile(Constants.LAUNCHER_MANIFEST));
+            task.setDieWithError(false);
+        }
+        {
+            EtagDownloadTask task = makeTask("getVersionJson", EtagDownloadTask.class);
+            class GetVersionJsonUrl extends DelayedString {
+                public GetVersionJsonUrl() {
+                    super(BasePlugin.this.project, "");
+                }
+
+                @Override
+                public String call() {
+                    try {
+                        LauncherManifest manifest = JsonFactory.loadMCVersionManifest(delayedFile(Constants.LAUNCHER_MANIFEST).call());
+                        String version = delayedString("{MC_VERSION}").call();
+                        LauncherManifest.VersionInfo info = manifest.getInfo(version);
+                        if (version == null)
+                            throw new IllegalStateException("Could not find version \"" + version + "\" in launcher_manifest_v2.json");
+                        return info.url;
+                    } catch (IOException e) {
+                        throw Throwables.propagate(e);
+                    }
+                }
+            }
+            task.dependsOn("getVersionJsonIndex");
+            task.getInputs().file(delayedFile(Constants.LAUNCHER_MANIFEST));
+            task.setUri(new GetVersionJsonUrl());
+            task.setFile(delayedFile(Constants.VERSION_JSON));
+            task.setDieWithError(false);
+        }
+
         // download tasks
-        DownloadTask task;
-
-        task = makeTask("downloadClient", DownloadTask.class);
         {
+            DownloadTask task = makeTask("downloadClient", DownloadTask.class);
+            task.getInputs().file(delayedFile(Constants.VERSION_JSON));
+            task.dependsOn("getVersionJson");
+
             task.setOutput(delayedFile(Constants.JAR_CLIENT_FRESH));
-            task.setUrl(delayedString(Constants.MC_JAR_URL));
+            task.setUrl(delayedVersionInfo(VersionInfoUrl.CLIENT));
         }
 
-        task = makeTask("downloadServer", DownloadTask.class);
         {
+            DownloadTask task = makeTask("downloadServer", DownloadTask.class);
+            task.getInputs().file(delayedFile(Constants.VERSION_JSON));
+            task.dependsOn("getVersionJson");
+
             task.setOutput(delayedFile(Constants.JAR_SERVER_FRESH));
-            task.setUrl(delayedString(Constants.MC_SERVER_URL));
+            task.setUrl(delayedVersionInfo(VersionInfoUrl.SERVER));
         }
 
-        ObtainFernFlowerTask mcpTask = makeTask("downloadMcpTools", ObtainFernFlowerTask.class);
         {
-            mcpTask.setMcpUrl(delayedString(Constants.MCP_URL));
-            mcpTask.setFfJar(delayedFile(Constants.FERNFLOWER));
+            ObtainFernFlowerTask task = makeTask("downloadMcpTools", ObtainFernFlowerTask.class);
+            task.setMcpUrl(delayedString(Constants.MCP_URL));
+            task.setFfJar(delayedFile(Constants.FERNFLOWER));
         }
 
-        DownloadTask getAssetsIndex = makeTask("getAssetsIndex", DownloadTask.class);
         {
-            getAssetsIndex.setUrl(delayedString(Constants.ASSETS_INDEX_URL));
-            getAssetsIndex.setOutput(delayedFile(Constants.ASSETS + "/indexes/{ASSET_INDEX}.json"));
-            getAssetsIndex.setDoesCache(false);
-
-            getAssetsIndex.doLast(new Action<Task>() {
-                public void execute(Task task)
-                {
-                    try
-                    {
-                        parseAssetIndex();
-                    }
-                    catch (Exception e)
-                    {
-                        Throwables.propagate(e);
-                    }
+            DownloadTask task = makeTask("getAssetsIndex", DownloadTask.class);
+            task.getInputs().file(delayedFile(Constants.VERSION_JSON));
+            task.dependsOn("getVersionJson");
+            task.setUrl(delayedVersionInfo(VersionInfoUrl.ASSETS));
+            task.setOutput(delayedFile(Constants.ASSETS + "/indexes/{ASSET_INDEX}.json"));
+            task.setDoesCache(false);
+            task.doLast(new Action<Task>() {
+                public void execute(Task task) {
+                    parseAssetIndex();
                 }
             });
 
-            getAssetsIndex.getOutputs().upToDateWhen(new Closure<Boolean>(this, null) {
-                public Boolean call(Object... obj)
-                {
+            task.getOutputs().upToDateWhen(new Closure<Boolean>(this, null) {
+                public Boolean call(Object... obj) {
                     return false;
                 }
             });
         }
 
-        DownloadAssetsTask assets = makeTask("getAssets", DownloadAssetsTask.class);
         {
-            assets.setAssetsDir(delayedFile(Constants.ASSETS));
-            assets.setIndex(getAssetIndexClosure());
-            assets.dependsOn("getAssetsIndex");
+            DownloadAssetsTask task = makeTask("getAssets", DownloadAssetsTask.class);
+            task.setAssetsDir(delayedFile(Constants.ASSETS));
+            task.setIndex(getAssetIndexClosure());
+            task.dependsOn("getAssetsIndex");
         }
 
-        Delete clearCache = makeTask("cleanCache", Delete.class);
         {
-            clearCache.delete(delayedFile("{CACHE_DIR}/minecraft"));
-            clearCache.setGroup("ForgeGradle");
-            clearCache.setDescription("Cleares the ForgeGradle cache. DONT RUN THIS unless you want a fresh start, or the dev tells you to.");
+            Delete task = makeTask("cleanCache", Delete.class);
+            task.delete(delayedFile("{CACHE_DIR}/minecraft"));
+            task.setGroup("ForgeGradle");
+            task.setDescription("Cleares the ForgeGradle cache. DONT RUN THIS unless you want a fresh start, or the dev tells you to.");
         }
     }
 
-    public void parseAssetIndex() throws JsonSyntaxException, JsonIOException, IOException
-    {
-        assetIndex = JsonFactory.loadAssetsIndex(delayedFile(Constants.ASSETS + "/indexes/{ASSET_INDEX}.json").call());
+    public void parseAssetIndex() {
+        File file = delayedFile(Constants.ASSETS + "/indexes/{ASSET_INDEX}.json").call();
+        try {
+            assetIndex = JsonFactory.loadAssetsIndex(file);
+        } catch (Exception e) {
+            throw new IllegalStateException("Could not parse " + file.getAbsolutePath());
+        }
     }
 
     @SuppressWarnings("serial")
@@ -351,4 +376,28 @@ public abstract class BasePlugin<K extends BaseExtension> implements Plugin<Proj
         return new DelayedFileTree(project, path, true, this);
     }
 
+    private enum VersionInfoUrl {
+        CLIENT, SERVER, ASSETS;
+    }
+
+    protected DelayedString delayedVersionInfo(final VersionInfoUrl wanted) {
+        return new DelayedString(this.project, "") {
+            private static final long serialVersionUID = 2653205184054155514L;
+
+            @Override
+            public String call() {
+                try {
+                    Version manifest = JsonFactory.loadVersion(delayedFile(Constants.VERSION_JSON).call());
+                    switch (wanted) {
+                        case CLIENT: return manifest.downloads.client.url;
+                        case SERVER: return manifest.downloads.server.url;
+                        case ASSETS: return manifest.assetIndex.url;
+                        default: throw new IllegalArgumentException("Unknown download type: " + wanted);
+                    }
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        };
+    }
 }

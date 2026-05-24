@@ -111,7 +111,7 @@ public abstract class UserBasePlugin extends BasePlugin<UserExtension>
         task.setGroup("ForgeGradle");
 
         project.getTasks().getByName("reobf").dependsOn("genSrgs");
-        
+
         // stop people screwing stuff up.
         project.getGradle().getTaskGraph().whenReady(new Closure<Object>(this, null) {
             @Override
@@ -119,27 +119,27 @@ public abstract class UserBasePlugin extends BasePlugin<UserExtension>
             {
                 TaskExecutionGraph graph = project.getGradle().getTaskGraph();
                 String path = project.getPath();
-                
+
                 if (graph.hasTask(path + "setupDecompWorkspace"))
                 {
                     if (!System.getProperty("java.version").startsWith("1.7"))
                     {
                         throw new RuntimeException("The setupDecompWorkspace will only work with Java 7! This is fixed in ForgeGradle 1.2");
                     }
-                    
+
                     getExtension().isDecomp = true;
                     boolean clean = ((ProcessJarTask) project.getTasks().getByName("deobfuscateJar")).isClean();
                     createMcModuleDep(clean, project.getDependencies(), CONFIG, true);
                 }
                 return null;
             }
-            
+
             @Override
             public Object call(Object obj)
             {
                 return call();
             }
-            
+
             @Override
             public Object call(Object... obj)
             {
@@ -250,7 +250,7 @@ public abstract class UserBasePlugin extends BasePlugin<UserExtension>
             task.setAssetsDir(delayedFile(ASSETS));
             task.setOutputDir(delayedFile("{ASSET_DIR}"));
             task.setAssetIndex(getAssetIndexClosure());
-            task.dependsOn("getAssets");
+            task.dependsOn("getAssets", "getAssetsIndex");
         }
     }
 
@@ -272,39 +272,39 @@ public abstract class UserBasePlugin extends BasePlugin<UserExtension>
 
         doPostDecompTasks(clean, decompOut);
         createMcModuleDep(clean, project.getDependencies(), CONFIG, false);
-        
+
         // get sourceSet
         Jar jarTask = (Jar) project.getTasks().getByName("jar");
-        
+
         JavaExec exec = makeTask("runClient", JavaExec.class);
         {
-        	exec.classpath(project.getConfigurations().getByName("runtime"));
-        	exec.classpath(jarTask.getArchivePath());
-        	exec.setMain("net.minecraft.launchwrapper.Launch");
-        	exec.jvmArgs("-Xincgc", "-Xmx1024M", "-Xms1024M", "-Dfml.ignoreInvalidMinecraftCertificates=true");
-        	exec.jvmArgs("-Djava.library.path=" + delayedFile(NATIVES_DIR).call().getAbsolutePath());
-        	exec.args("--version 1.7", "--tweakClass", "cpw.mods.fml.common.launcher.FMLTweaker", "--username=ForgeDevName", "--accessToken", "FML");
-        	exec.setWorkingDir(delayedFile("{ASSET_DIR}").call().getParentFile());
-        	exec.setStandardOutput(System.out);
-        	exec.setErrorOutput(System.err);
-        	
-        	exec.dependsOn(jarTask);
+            exec.classpath(project.getConfigurations().getByName("runtime"));
+            exec.classpath(jarTask.getArchivePath());
+            exec.setMain("net.minecraft.launchwrapper.Launch");
+            exec.jvmArgs("-Xincgc", "-Xmx1024M", "-Xms1024M", "-Dfml.ignoreInvalidMinecraftCertificates=true");
+            exec.jvmArgs("-Djava.library.path=" + delayedFile(NATIVES_DIR).call().getAbsolutePath());
+            exec.args("--version 1.7", "--tweakClass", "cpw.mods.fml.common.launcher.FMLTweaker", "--username=ForgeDevName", "--accessToken", "FML");
+            exec.setWorkingDir(delayedFile("{ASSET_DIR}").call().getParentFile());
+            exec.setStandardOutput(System.out);
+            exec.setErrorOutput(System.err);
+
+            exec.dependsOn(jarTask);
         }
-        
+
         exec = makeTask("runServer", JavaExec.class);
         {
             exec.classpath(project.getConfigurations().getByName("runtime"));
             exec.classpath(jarTask.getArchivePath());
-        	exec.setMain("cpw.mods.fml.relauncher.ServerLaunchWrapper");
-        	exec.jvmArgs("-Xincgc", "-Dfml.ignoreInvalidMinecraftCertificates=true");
-        	exec.setWorkingDir(delayedFile("{ASSET_DIR}").call().getParentFile());
-        	exec.setStandardOutput(System.out);
-        	exec.setStandardInput(System.in);
-        	exec.setErrorOutput(System.err);
-        	
-        	exec.dependsOn(jarTask);
+            exec.setMain("cpw.mods.fml.relauncher.ServerLaunchWrapper");
+            exec.jvmArgs("-Xincgc", "-Dfml.ignoreInvalidMinecraftCertificates=true");
+            exec.setWorkingDir(delayedFile("{ASSET_DIR}").call().getParentFile());
+            exec.setStandardOutput(System.out);
+            exec.setStandardInput(System.in);
+            exec.setErrorOutput(System.err);
+
+            exec.dependsOn(jarTask);
         }
-        
+
         exec = makeTask("debugClient", JavaExec.class);
         {
             exec.classpath(project.getConfigurations().getByName("runtime"));
@@ -317,10 +317,10 @@ public abstract class UserBasePlugin extends BasePlugin<UserExtension>
             exec.setStandardOutput(System.out);
             exec.setErrorOutput(System.err);
             exec.setDebug(true);
-            
+
             exec.dependsOn(jarTask);
         }
-        
+
         exec = makeTask("debugServer", JavaExec.class);
         {
             exec.classpath(project.getConfigurations().getByName("runtime"));
@@ -332,7 +332,7 @@ public abstract class UserBasePlugin extends BasePlugin<UserExtension>
             exec.setStandardInput(System.in);
             exec.setErrorOutput(System.err);
             exec.setDebug(true);
-            
+
             exec.dependsOn(jarTask);
         }
     }
@@ -731,7 +731,7 @@ public abstract class UserBasePlugin extends BasePlugin<UserExtension>
                 }
             }
         }
-        
+
         // check for decompilation status.. has decompiled or not etc
         checkDecompStatus();
 
@@ -744,13 +744,13 @@ public abstract class UserBasePlugin extends BasePlugin<UserExtension>
         // fix eclipse project location...
         fixEclipseProject(ECLIPSE_LOCATION);
     }
-    
+
     @Override
     public void finalCall()
     {
         //final boolean isClean = !((ProcessJarTask) project.getTasks().getByName("deobfBinJar")).isClean();
         final boolean isDecomp = getExtension().isDecomp;
-        
+
         if (isDecomp)
         {
             // its assumed that the dev workspace has already been run.
